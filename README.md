@@ -20,7 +20,7 @@ SORACOMのサービスを使うことを前提にしているので、SORACOMの
 ```
 - Seeed WioLTE
 ```
-ハードウエアとしてSeeed社のWioLTEという、LTE/3GモデムとSTM32マイコン(ARM)が一体となっているマイコンボードを利用します。\
+ハードウエアとしてSeeed社の[WioLTE](https://wiki.seeedstudio.com/Wio_LTE_Cat.1/)という、LTE/3GモデムとSTM32マイコン(ARM)が一体となっているマイコンボードを利用します。\
 モデムはQuectelのEC21-Jが使われています。
 
 ### このデバイスがやること
