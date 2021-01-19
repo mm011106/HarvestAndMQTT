@@ -1,6 +1,9 @@
 # HarvestAndMQTT
 
-ネットワークレディでないデバイスとUARTで通信することで、ネットワーク機能を付加しようとする試み。
+この装置にあるネットワーク接続のためのモデムを使って、\
+ネットワークレディでないデバイスにネットワーク機能を付加しようとする試み。
+
+本装置へのネットワークトラフィックを適宜解釈し、その内容をUART上でデバイスと通信することで擬似的なネットワーク接続を提供する。
 
 ## 背景
 
@@ -24,46 +27,17 @@ SORACOMのサービスを使うことを前提にしているので、SORACOMの
 モデムはQuectelのEC21-Jが使われています。
 
 ### このデバイスがやること
+- ネットワーク上（MQTT - subscribe）の通信を受け取って、適宜解釈を施し、UARTに送ります。
+- UARTからの通信を必要に応じて加工し、ネットワーク上（MQTT - publish)に送り出します。
 
-A step by step series of examples that tell you how to get a development env running
+MQTTのサーバ（broker)はAWS-IoTを想定しています。\
+さらに回線はSORACOMのサービスを用い、AWSとは認証と暗号化で保護された通信を確保します。
 
-Say what the step will be
+## これから実装するべき項目
 
-```
-Give the example
-```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
-
-## Running the tests
-
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-
-Explain what these tests test and why
-
-```
+- コマンド／
 Give an example
-```
-
-### And coding style tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
+Give 
 
 ## 開発環境
 ソフトウエア開発については
