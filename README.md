@@ -35,9 +35,9 @@ MQTTのサーバ（broker)はAWS-IoTを想定しています。\
 
 ## これから実装するべき項目
 
-- コマンド／
-Give an example
-Give 
+- コマンド・結果をやりとりするためのプロトコル
+- プロトコルを実現するためのデバイスのパラメタやフラグ（「シャドウ」に反映する必要も含めて）
+
 
 ## 開発環境
 ソフトウエア開発については
@@ -52,7 +52,8 @@ Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c6
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+We use [SemVer](http://semver.org/) for versioning. 
+<!-- For the versions available, see the [tags on this repository](https://github.com/your/project/tags).  -->
 
 ## Authors
 
