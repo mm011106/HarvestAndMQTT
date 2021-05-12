@@ -1,7 +1,0 @@
-{
-    "board": "SeeedJP:stm32:WioLTE",
-    "configuration": "Debug=Disabled",
-    "sketch": "HarvestAndMQTT.ino",
-    "port": "/dev/tty.usbserial-DM02LZG8",
-    "output": "../build"
-}
