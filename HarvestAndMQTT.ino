@@ -19,6 +19,11 @@
 #include <Adafruit_BME280.h>
 #include <stdio.h>
 #include <Arduino_JSON.h>
+#if defined ARDUINO_ARCH_STM32F4
+#include <SD.h>                    // https://github.com/Seeed-Studio/SD
+#elif defined ARDUINO_ARCH_STM32
+#include <SDforWioLTE.h>           // https://github.com/SeeedJP/SDforWioLTE
+#endif
 
 #define INTERVAL        (60000)
 #define RECEIVE_TIMEOUT (10000)
@@ -26,6 +31,7 @@
 constexpr boolean NETWORK_ON = true;
 
 constexpr char ID_HEADER[] = "ET_EI001_";
+constexpr char LOG_FILE_NAME[] = "NET_LOG.TXT";
 
 #define MQTT_SERVER_HOST  "beam.soracom.io"
 #define MQTT_SERVER_PORT  (1883)
@@ -65,6 +71,7 @@ WioLTE Wio;
 
 WioLTEClient WioClient(&Wio);
 PubSubClient MqttClient;
+File log_file;
 
 HardwareTimer Timer1(TIM2);
 
@@ -99,6 +106,10 @@ void setup()
   
   Wio.PowerSupplyLTE(true);
   delay(500);
+
+  if (!SD.begin()) {
+    SerialUSB.println("### ERR:SD interface");
+  }
 
   unsigned status;
 
@@ -184,7 +195,16 @@ void setup()
 
     SerialUSB.println("---  INIT:   finished... ");
     SerialUSB.println("");
-    
+    {
+      struct tm now;
+      if (!Wio.GetTime(&now)) {
+        SerialUSB.println("### ERR:GetTime()");
+      }
+      SerialUSB.print("UTC:");
+      char* tmp = asctime(&now);
+      tmp[strlen(tmp)-1]=NULL;
+      SerialUSB.println(tmp);
+    }
     Timer1.resume();
 }
  
@@ -193,7 +213,7 @@ void loop()
   MqttClient.loop();
 
   if (f_tick){
-    // 毎分の実行
+    // 毎分の実行：センサの値を読んでHarvestに送る
     if ((tickCount % 60)==0){
 
       struct tm now;
@@ -210,21 +230,36 @@ void loop()
       sendHarvest(readings);
     }
 
-    //  ５分毎の実行
+    //  ５分毎の実行:ネットワークエラーのチェック
     if ((tickCount % 300)==0){
+
       struct tm now;
       if (!Wio.GetTime(&now)) {
         SerialUSB.println("### ERR:GetTime()");
       }
       SerialUSB.print("UTC:");
       SerialUSB.print(asctime(&now));
+      char* tmp = asctime(&now);
+      tmp[strlen(tmp)-1]=NULL;
+      SerialUSB.print(tmp);
 
       uint16_t net_err_total=0;
       for (int i=0; i<(net_err_code_t)E_PING+1; i++){
         net_err_total+=bin_net_err[i];
       }
-      SerialUSB.print("Network err in total:");
+      SerialUSB.print(";total network err;");
       SerialUSB.println(net_err_total);
+
+      log_file = SD.open(LOG_FILE_NAME, FILE_WRITE);
+      if (!log_file) {
+        SerialUSB.println("### ERR: File Open ###");
+      }else{
+        log_file.print(tmp);
+        log_file.print(";");
+        log_file.print("total network err;");
+        log_file.println(net_err_total);
+        log_file.close();
+      }
     }
 
     f_tick = false;
@@ -232,6 +267,7 @@ void loop()
 
   delay(100);
 }
+// end of main loop
 
 void tickTack(HardwareTimer *HT) {
   tickCount++;
