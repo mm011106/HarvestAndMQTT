@@ -25,6 +25,8 @@
 #include <SDforWioLTE.h>           // https://github.com/SeeedJP/SDforWioLTE
 #endif
 
+
+
 #define INTERVAL        (60000)
 #define RECEIVE_TIMEOUT (10000)
 
@@ -88,6 +90,8 @@ bme280_reading_t sensor_readings;
 
 uint16_t bin_net_err[(net_err_code_t)E_PING + 1]={};
 
+String inputString="";
+
 void setup() 
 {
   // wait the srial monitor on the host to be ready. これを有効にするとスクリプトがシリアルポートを待つので、
@@ -119,12 +123,12 @@ void setup()
   // You can also pass in a Wire library object like &Wire2
   status = bme.begin(0x76, &Wire);
   if (!status) {
-      Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
-      Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
-      Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
-      Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
-      Serial.print("        ID of 0x60 represents a BME 280.\n");
-      Serial.print("        ID of 0x61 represents a BME 680.\n");
+      SerialUSB.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+      SerialUSB.print("SensorID was: 0x"); SerialUSB.println(bme.sensorID(),16);
+      SerialUSB.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+      SerialUSB.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+      SerialUSB.print("        ID of 0x60 represents a BME 280.\n");
+      SerialUSB.print("        ID of 0x61 represents a BME 680.\n");
       while (1) delay(10);
   }
 
@@ -206,11 +210,18 @@ void setup()
       SerialUSB.println(tmp);
     }
     Timer1.resume();
+
+    // #1  UARTの設定 jsonデータを受け付けるポート
+    // データができるだけバッファにたまらない様、mainの直前にデバイスを動作させる
+    // バッファサイズを128byteに変更している。wioLTEのHardwareSerial参照のこと。
+    Serial.begin(9600);
+    Serial.flush();
 }
  
 void loop() 
 {
   MqttClient.loop();
+  serialCheck();
 
   if (f_tick){
     // 毎分の実行：センサの値を読んでHarvestに送る
@@ -265,7 +276,8 @@ void loop()
     f_tick = false;
   }
 
-  delay(100);
+  // ループ待ち時間 50ms以上にするとUARTバッファがオーバーランする可能性あり
+  delay(50);
 }
 // end of main loop
 
@@ -282,7 +294,7 @@ void tickTack(HardwareTimer *HT) {
 }
 
 /*! 
-    @brief  Harvestにデータを送る
+    @brief  Harvestにbme280からのデータを送る
     @param value JSONフォマットのデータ
     @return True:正常終了   False:送信エラー
 */
@@ -449,4 +461,90 @@ void catch_net_error(const net_err_code_t code, uint16_t* bin){
   //   SerialUSB.println(bin[i]);
   // }
   return;
+}
+
+
+/*! 
+    @brief  UARTのポートにデータがあるかどうかチェックして読み込み、その後データを送信する
+*/
+void serialCheck(void) {
+  // SerialUSB.print(Serial.available());
+  if (Serial.available()>0){ 
+    SerialUSB.print(Serial.available());
+    SerialUSB.print("-");
+  }
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    inputString += inChar;
+    // SerialUSB.print(inChar);
+
+    if (inChar == '\n') { 
+      SerialUSB.print("Recv: ");
+      SerialUSB.println(inputString);
+      sendHarvest_json(inputString);
+      inputString="";
+    }
+  }
+
+}
+
+boolean sendHarvest_json(String json_data){
+
+  if(NETWORK_ON){
+
+    char data[64];
+    // sprintf(data,"{\"temp\":%.1f}", value.temperature);
+    
+    uint16_t connectId;
+    connectId = Wio.SocketOpen(host_soracom_harvest.name , host_soracom_harvest.port , WIOLTE_UDP);
+    if (connectId < 0) {
+      SerialUSB.println("### Socket Connection ERROR! ###");
+      catch_net_error(E_OPEN_CLOSE, bin_net_err);
+      return false;
+    }
+
+    // SerialUSB.println("### Send.");
+    SerialUSB.print(">");
+    SerialUSB.print(json_data.c_str());
+    SerialUSB.println("");
+
+    if (Wio.SocketSend(connectId, json_data.c_str())) {
+      //  送信が成功したらアクノリッジを読み込む
+      // SerialUSB.println("### Receive.");
+      int length=-1;
+      length = Wio.SocketReceive(connectId, data, sizeof (data), RECEIVE_TIMEOUT);
+      
+      if (length > 0) {
+        SerialUSB.print("<");
+        SerialUSB.print(data);
+        SerialUSB.println("");
+      }  else if (length == 0) {
+        SerialUSB.println("### RECEIVE TIMEOUT! ###");
+        catch_net_error(E_TIMEOUT, bin_net_err);
+        return false;
+      } else {
+        SerialUSB.println("### Receive ERROR! ###");
+        catch_net_error(E_SEND_RECEIVE, bin_net_err);
+        return false;
+      }
+
+    } else { 
+      // 送信失敗の場合
+      SerialUSB.println("### Send ERROR! ###");
+      catch_net_error(E_SEND_RECEIVE, bin_net_err);
+      return false;
+    }
+
+    // SerialUSB.println("### Close.");
+    if (!Wio.SocketClose(connectId)) {
+      SerialUSB.println("### Socket Close ERROR! ###");
+      catch_net_error(E_OPEN_CLOSE, bin_net_err);
+      return false;
+    }
+
+  } else {
+    SerialUSB.println("Network interface is closed.");
+  }
+
+  return true;
 }
